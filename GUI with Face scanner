@@ -1,0 +1,166 @@
+#!/usr/bin/python
+import cv2
+from cv2 import *
+import numpy as np
+import face_recognition
+import os
+from datetime import datetime
+import subprocess
+from tkinter import *
+import tkinter as tk
+import time
+
+#from tkinter import ttk
+from PIL import Image, ImageTk
+
+
+def scanface():
+
+    path = 'ImagesAttendance'
+    images = []
+    staffnames = []
+    myList = os.listdir(path)
+    print(myList)
+    for st in myList:
+        curImg = cv2.imread(f'{path}/{st}')
+        images.append(curImg)
+        staffnames.append(os.path.splitext(st)[0])
+    print(staffnames)
+
+    def findEncodings(images):
+        encodeList = []
+        for img in images:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            # finding encodings
+            encode = face_recognition.face_encodings(img)[0]
+            encodeList.append(encode)
+        return encodeList
+
+    def createAttendance(name):
+        # datetime library usage
+        with open('Attendance.csv', 'r+') as f:
+            myDataList = f.readlines()
+            nameList = []
+            for line in myDataList:
+                entry = line.split(',')
+                nameList.append(entry[0])
+            if name not in nameList:
+                now = datetime.now()
+                dateString = now.strftime('%H:%M:%S')
+                f.writelines(f'\n{name},{dateString}')
+
+    encodeListKnown = findEncodings(images)
+    print('Encoding Complete')
+
+    cap = cv2.VideoCapture(0)
+
+    while True:
+        success, img = cap.read()
+        # because its real time capture, we wld reduce the size of image to speed up the process
+        imgS = cv2.resize(img, (0, 0), None, 0.25, 0.25)
+
+        # realtime image size has been divided by 4 using 0.25
+        imgS = cv2.cvtColor(imgS, cv2.COLOR_BGR2RGB)
+
+        facesCurFrame = face_recognition.face_locations(imgS)
+        encodeCurFrame = face_recognition.face_encodings(imgS, facesCurFrame)
+        # finding matches
+        for encodeFace, faceLoc in zip(encodeCurFrame, facesCurFrame):
+            matches = face_recognition.compare_faces(encodeListKnown, encodeFace)
+            faceDis = face_recognition.face_distance(encodeListKnown, encodeFace)
+            print(faceDis)
+
+            matchIndex = np.argmin(faceDis)
+            print('matchIndex', matchIndex)
+
+            if matches[matchIndex]:
+                name = staffnames[matchIndex].upper()
+                print(name + str(" has been been authenticated"))
+                y1, x2, y2, x1 = faceLoc
+                y1, x2, y2, x1 = y1 * 4, x2 * 4, y2 * 4, x1 * 4
+                # ^ rezise of small images for box dimensions
+                cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                cv2.rectangle(img, (x1, y2 - 35), (x2, y2), (0, 0, 0), cv2.FILLED)
+                cv2.putText(img, name, (x1 + 6, y2 - 6), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 0, 255), 2)
+                cv2.imshow('Webcam', img)
+                createAttendance(name)
+                scanner.destroy(b1)
+
+
+            else:
+                print("No Face Recognized")
+
+        # press'esc' to close program
+        cv2.imshow('Webcam', img)
+        cv2.waitKey(1)
+      #release camera
+    #cap.release()
+    #cv2.destroyAllWindows()
+
+
+def cam():
+    videoCaptureObject = cv2.VideoCapture(0)
+    while(True):
+        num1 = 0
+        path1 = 'ImageBasic'
+        path2 = 'ImagesAttendance'
+        person = input("please enter your First and last name: ")
+        while num1 < 5:
+            ret, frame = videoCaptureObject.read()
+            cv2.imshow('camera', frame)
+            input("press enter when Ready to take image. This is a NO MASK image. ")
+            res = person + str(num1)
+            if num1 == 0:
+                cv2.imwrite(path2 + '\ ' + person + str(".jpg"), frame)
+                cv2.imwrite(path1 + '\ ' + res + str(".jpg"), frame)
+            else:
+                cv2.imwrite(path1 + '\ ' + res + str(".jpg"), frame)
+            num1 = num1 + 1
+            time.sleep(1)
+            cv2.destroyWindow('camera')
+
+        while num1 < 10:
+            ret, frame = videoCaptureObject.read()
+            cv2.imshow('camera', frame)
+            input("press enter when Ready to take image. This is an image with the MASK ON. ")
+            res = person + str(num1)
+            cv2.imwrite(path1 + '\ ' + res + str(".jpg"), frame)
+            num1 = num1 + 1
+            time.sleep(1)
+            cv2.destroyWindow('camera')
+
+
+        scanner.destroy(b2)
+
+
+def addface():
+  #  key_in = input("please type in the name of the user: ")
+    subprocess.Popen(r'explorer /select, "C:\Users\owenj\PycharmProjects\pythonProject\SenDes\ImageBasic"')
+
+
+scanner = Tk()
+width = scanner.winfo_screenwidth()
+height = scanner.winfo_screenheight()
+#scanner.geometry("%dx%d"%(width,height))
+scanner.title('Face Scanner System')
+scanner.geometry('700x700')
+scanner['bg'] = '#5F9EF0'
+
+b1 = Button(scanner, text='Scan a face', activebackground='#5F0AFF', padx=20, pady=3, bd=7, command=scanface)
+b1.pack(padx=10, pady=10)
+
+b2 = Button(scanner, text='Add a user', activebackground='#000000', padx=20, pady=7, bd=7, command=cam)
+b2.pack(padx=10)
+
+b3 = Button(scanner, text='Exit', bd='7', padx=20, pady=3, command=scanner.destroy)
+b3.pack(padx=10,pady=10)
+
+im = Image.open(
+    "C:/PycharmProjects/homework/face.jpg")  # This is the correct location and spelling for my image location
+photo = ImageTk.PhotoImage(im)
+cv = tk.Canvas()
+cv.pack(side='top', fill='both', expand='yes')
+cv.create_image(10, 0, image=photo, anchor='nw')
+# message_box = Message(screen,text)
+
+scanner.mainloop()
